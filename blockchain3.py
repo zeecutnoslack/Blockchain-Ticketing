@@ -1,204 +1,230 @@
 import streamlit as st
-import time, hashlib, random, qrcode
+import random
+import time
+import qrcode
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
-# ---------------- Blockchain ----------------
+# -----------------------------
+# Blockchain Class
+# -----------------------------
 class Block:
-    def __init__(self, index, timestamp, data, prev_hash):
+    def __init__(self, index, data, prev_hash):
         self.index = index
-        self.timestamp = timestamp
+        self.timestamp = time.ctime()
         self.data = data
         self.prev_hash = prev_hash
-        self.hash = self.calc_hash()
-
-    def calc_hash(self):
-        return hashlib.sha256(
-            f"{self.index}{self.timestamp}{self.data}{self.prev_hash}".encode()
-        ).hexdigest()
+        self.hash = hash((self.index, self.timestamp, str(self.data), self.prev_hash))
 
 
 class Blockchain:
     def __init__(self):
-        self.chain = [self.genesis_block()]
+        self.chain = [self.create_genesis()]
 
-    def genesis_block(self):
-        return Block(0, time.time(), {"genesis": True}, "0")
+    def create_genesis(self):
+        return Block(0, "Genesis Block", "0")
 
     def add_block(self, data):
-        prev = self.chain[-1]
-        block = Block(len(self.chain), time.time(), data, prev.hash)
-        self.chain.append(block)
-        return block
+        prev_block = self.chain[-1]
+        new_block = Block(len(self.chain), data, prev_block.hash)
+        self.chain.append(new_block)
 
-    def is_ticket_valid(self, ticket_id):
-        for block in self.chain:
-            if block.data.get("ticket_id") == ticket_id:
-                return True, block.data
-        return False, None
+    def get_chain(self):
+        return self.chain
 
 
-# ---------------- Events ----------------
-events = [
-    {
-        "artist": "Imagine Dragons",
-        "image": "https://upload.wikimedia.org/wikipedia/en/0/05/Imagine_Dragons.png",
-        "dates": [
-            {"city": "Mumbai", "date": "2025-11-10", "price": 3000},
-            {"city": "Delhi", "date": "2025-11-12", "price": 2800},
-        ],
-    },
-    {
-        "artist": "Arijit Singh",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Arijit_Singh.png",
-        "dates": [
-            {"city": "Kolkata", "date": "2025-11-15", "price": 2000},
-            {"city": "Bangalore", "date": "2025-11-18", "price": 2200},
-        ],
-    },
-    {
-        "artist": "BTS",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/9/97/BTS_logo.png",
-        "dates": [
-            {"city": "Seoul", "date": "2025-12-01", "price": 10000},
-            {"city": "Tokyo", "date": "2025-12-05", "price": 9500},
-        ],
-    },
-    {
-        "artist": "Taylor Swift",
-        "image": "https://upload.wikimedia.org/wikipedia/en/f/f6/Taylor_Swift.png",
-        "dates": [
-            {"city": "London", "date": "2025-12-10", "price": 12000},
-            {"city": "New York", "date": "2025-12-15", "price": 12500},
-        ],
-    },
-]
-
-# ---------------- Session ----------------
+# -----------------------------
+# Initialize Session State
+# -----------------------------
 if "blockchain" not in st.session_state:
     st.session_state["blockchain"] = Blockchain()
-if "menu" not in st.session_state:
-    st.session_state["menu"] = "Home"
+if "events" not in st.session_state:
+    st.session_state["events"] = [
+        {
+            "artist": "Imagine Dragons",
+            "event": "Night Visions Tour",
+            "date": "2025-10-12",
+            "time": "7:30 PM",
+            "venue": "Mumbai Stadium",
+            "location": "Mumbai, India",
+            "price": 2500,
+            "total_seats": 30,
+            "available_seats": [f"A{i}" for i in range(1, 31)],
+            "perks": ["Free Drinks", "Backstage Access"],
+            "banner": "https://upload.wikimedia.org/wikipedia/en/3/3f/Imagine_Dragons_Night_Visions.jpg"
+        },
+        {
+            "artist": "Arijit Singh",
+            "event": "Romantic Melodies",
+            "date": "2025-11-05",
+            "time": "8:00 PM",
+            "venue": "Delhi Concert Arena",
+            "location": "Delhi, India",
+            "price": 1800,
+            "total_seats": 25,
+            "available_seats": [f"B{i}" for i in range(1, 26)],
+            "perks": ["Meet & Greet", "VIP Lounge"],
+            "banner": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Arijit_Singh.jpg"
+        },
+        {
+            "artist": "Taylor Swift",
+            "event": "Eras Tour",
+            "date": "2025-12-20",
+            "time": "6:30 PM",
+            "venue": "Bengaluru Open Grounds",
+            "location": "Bengaluru, India",
+            "price": 4500,
+            "total_seats": 40,
+            "available_seats": [f"C{i}" for i in range(1, 41)],
+            "perks": ["Signed Poster", "Premium Goodies"],
+            "banner": "https://upload.wikimedia.org/wikipedia/en/f/f2/Taylor_Swift_-_1989.png"
+        },
+        {
+            "artist": "Coldplay",
+            "event": "Music of the Spheres",
+            "date": "2026-01-15",
+            "time": "7:00 PM",
+            "venue": "Hyderabad Rock Arena",
+            "location": "Hyderabad, India",
+            "price": 3200,
+            "total_seats": 35,
+            "available_seats": [f"D{i}" for i in range(1, 36)],
+            "perks": ["Glow Bands", "Exclusive Merch"],
+            "banner": "https://upload.wikimedia.org/wikipedia/en/0/0a/Coldplay_-_Music_of_the_Spheres.png"
+        },
+    ]
 if "selected_event" not in st.session_state:
     st.session_state["selected_event"] = None
+if "ticket" not in st.session_state:
+    st.session_state["ticket"] = None
 
-# ---------------- Menu ----------------
-menu = st.radio(
-    "Navigate",
-    ["Home", "Buy Ticket", "Verify Ticket", "Ledger"],
-    horizontal=True,
-    index=["Home", "Buy Ticket", "Verify Ticket", "Ledger"].index(st.session_state["menu"]),
-)
-st.session_state["menu"] = menu
 
-# ---------------- Home ----------------
-if menu == "Home":
-    st.title("🎟️ Blockchain Event Ticketing")
-    st.subheader("Choose your concert experience")
+# -----------------------------
+# Generate QR Code
+# -----------------------------
+def generate_qr(data: str):
+    qr = qrcode.make(data)
+    buf = BytesIO()
+    qr.save(buf, format="PNG")
+    return buf
 
-    cols = st.columns(2)
-    for i, ev in enumerate(events):
-        with cols[i % 2]:
-            st.image(ev["image"], width=250)
+
+# -----------------------------
+# Main App
+# -----------------------------
+st.set_page_config(page_title="🎟️ Blockchain Ticketing", layout="wide")
+st.title("🎶 Blockchain-Powered Concert Ticketing System")
+
+menu = st.tabs(["🏠 Home", "🎫 Buy Ticket", "✅ Verify Ticket", "📜 Ledger"])
+
+# -----------------------------
+# HOME TAB
+# -----------------------------
+with menu[0]:
+    st.subheader("🔥 Upcoming Events")
+    cols = st.columns(len(st.session_state["events"]))
+
+    for i, ev in enumerate(st.session_state["events"]):
+        with cols[i]:
+            st.image(ev["banner"], use_container_width=True)
             st.markdown(f"### {ev['artist']}")
-            for d in ev["dates"]:
-                st.write(f"📍 {d['city']} — {d['date']} — ₹{d['price']}")
-            if st.button("Book Now", key=f"book_{i}"):
+            st.markdown(f"**Event:** {ev['event']}")
+            st.markdown(f"📍 {ev['venue']} - {ev['location']}")
+            st.markdown(f"📅 {ev['date']} | 🕒 {ev['time']}")
+            st.markdown(f"💰 Price: ₹{ev['price']}")
+            st.markdown(f"🎟️ Seats Left: {len(ev['available_seats'])}/{ev['total_seats']}")
+            if st.button(f"Book Now - {ev['artist']}", key=f"book_{i}"):
                 st.session_state["selected_event"] = ev
-                st.session_state["menu"] = "Buy Ticket"
-                st.rerun()
+                st.session_state["ticket"] = None
 
-# ---------------- Buy Ticket ----------------
-elif menu == "Buy Ticket":
-    if st.session_state["selected_event"] is None:
-        st.warning("Pick an event from Home first.")
+
+# -----------------------------
+# BUY TICKET TAB
+# -----------------------------
+with menu[1]:
+    if not st.session_state["selected_event"]:
+        st.warning("👉 Select an event from Home to continue.")
     else:
         ev = st.session_state["selected_event"]
-        st.header(f"🎤 Book Tickets for {ev['artist']}")
-        st.image(ev["image"], width=300)
+        st.header(f"🎫 Booking: {ev['event']} - {ev['artist']}")
+        st.image(ev["banner"], use_container_width=True)
+        st.markdown(f"📍 Venue: **{ev['venue']} - {ev['location']}**")
+        st.markdown(f"📅 {ev['date']} | 🕒 {ev['time']}")
+        st.markdown(f"💰 Price per Ticket: **₹{ev['price']}**")
+        st.markdown(f"🎟️ Seats Left: **{len(ev['available_seats'])}**")
 
-        buyer_name = st.text_input("👤 Your Name")
-        city_date = st.selectbox(
-            "📅 Choose Date & Location",
-            [f"{d['city']} — {d['date']} — ₹{d['price']}" for d in ev["dates"]],
-        )
-        tickets = st.number_input("🎟 Number of Tickets", 1, 6, 1)
+        buyer = st.text_input("👤 Enter Your Name")
+        num_tickets = st.number_input("🎟️ Number of Tickets", min_value=1, max_value=5, value=1)
+        seats = st.multiselect("🪑 Select Your Seats", ev["available_seats"], max_selections=num_tickets)
+        perk = st.selectbox("✨ Choose a Perk", ev["perks"])
 
-        # Seat selection
-        row = st.selectbox("Row", ["A", "B", "C", "D"])
-        seat_num = st.selectbox("Seat Number", list(range(1, 11)))
-        seat = f"{row}{seat_num}"
+        if st.button("Proceed to Payment"):
+            if not buyer or len(seats) != num_tickets:
+                st.error("⚠️ Please enter name and select required number of seats.")
+            else:
+                total_cost = ev["price"] * num_tickets
+                st.success(f"✅ Payment Successful! Amount Paid: ₹{total_cost}")
+                for s in seats:
+                    ev["available_seats"].remove(s)
 
-        # Perks
-        perks = st.multiselect("✨ Choose Perks", ["Free Merch", "Backstage Pass", "Food & Drinks"])
-
-        # Seat type pricing
-        seat_type = st.radio("Seat Type", ["Regular", "VIP (+₹2000)", "VVIP (+₹5000)"])
-
-        # Mock payment
-        st.subheader("💳 Payment Details")
-        card = st.text_input("Card Number")
-        cvv = st.text_input("CVV", type="password")
-
-        if st.button("Confirm & Pay"):
-            base_price = next(d["price"] for d in ev["dates"] if d["city"] in city_date)
-            extra = 0
-            if "VIP" in seat_type:
-                extra = 2000
-            if "VVIP" in seat_type:
-                extra = 5000
-            total = (base_price + extra) * tickets
-
-            st.success(f"✅ Payment successful! You paid ₹{total}")
-            ticket_id = str(random.randint(1000000000, 9999999999))
-
-            st.session_state["blockchain"].add_block(
-                {
+                ticket_id = f"TKT{random.randint(1000,9999)}"
+                ticket_data = {
                     "ticket_id": ticket_id,
-                    "buyer": buyer_name,
-                    "event": ev["artist"],
-                    "city_date": city_date,
-                    "seat": seat,
-                    "seat_type": seat_type,
-                    "perks": perks,
-                    "tickets": tickets,
-                    "amount": total,
+                    "buyer": buyer,
+                    "artist": ev["artist"],
+                    "event": ev["event"],
+                    "date": ev["date"],
+                    "time": ev["time"],
+                    "venue": ev["venue"],
+                    "location": ev["location"],
+                    "seats": seats,
+                    "perk": perk,
+                    "price": total_cost,
                 }
-            )
+                st.session_state["blockchain"].add_block(ticket_data)
+                st.session_state["ticket"] = ticket_data
 
-            # QR code
-            qr = qrcode.make(f"Ticket ID: {ticket_id}\nEvent: {ev['artist']}\nSeat: {seat}")
-            buf = BytesIO()
-            qr.save(buf)
-            st.image(Image.open(BytesIO(buf.getvalue())), caption="Your Ticket QR Code")
+        if st.session_state["ticket"]:
+            t = st.session_state["ticket"]
+            st.subheader("🎟️ Your Digital Ticket")
+            st.markdown(f"**Ticket ID:** {t['ticket_id']}")
+            st.markdown(f"👤 Name: {t['buyer']}")
+            st.markdown(f"🎶 Artist: {t['artist']}")
+            st.markdown(f"📍 Venue: {t['venue']} - {t['location']}")
+            st.markdown(f"📅 {t['date']} | 🕒 {t['time']}")
+            st.markdown(f"🪑 Seats: {', '.join(t['seats'])}")
+            st.markdown(f"✨ Perk: {t['perk']}")
+            st.markdown(f"💰 Paid: ₹{t['price']}")
 
-            st.info(f"🎟️ Your Ticket ID: {ticket_id}")
+            qr_buf = generate_qr(f"TicketID: {t['ticket_id']} | Buyer: {t['buyer']} | Seats: {t['seats']}")
+            st.image(qr_buf, caption="Scan for Ticket Verification", use_container_width=False)
 
-# ---------------- Verify Ticket ----------------
-elif menu == "Verify Ticket":
-    st.header("🔍 Verify Ticket")
-    ticket_id = st.text_input("Enter Ticket ID")
+
+# -----------------------------
+# VERIFY TICKET TAB
+# -----------------------------
+with menu[2]:
+    st.subheader("🔍 Verify Ticket")
+    tid = st.text_input("Enter Ticket ID to verify")
     if st.button("Verify"):
-        valid, data = st.session_state["blockchain"].is_ticket_valid(ticket_id)
-        if valid:
-            st.success("✔ Ticket is VALID")
-            st.markdown(f"""
-            **Buyer:** {data['buyer']}  
-            **Event:** {data['event']}  
-            **Location & Date:** {data['city_date']}  
-            **Seat:** {data['seat']} ({data['seat_type']})  
-            **Tickets:** {data['tickets']}  
-            **Amount Paid:** ₹{data['amount']}  
-            **Perks:** {', '.join(data['perks']) if data['perks'] else 'None'}  
-            """)
-        else:
-            st.error("❌ Ticket not found")
+        valid = False
+        for blk in st.session_state["blockchain"].chain:
+            if isinstance(blk.data, dict) and blk.data.get("ticket_id") == tid:
+                st.success(f"✅ Ticket is valid for {blk.data['event']} - {blk.data['artist']}")
+                st.json(blk.data)
+                valid = True
+                break
+        if not valid:
+            st.error("❌ Ticket not found!")
 
-# ---------------- Ledger ----------------
-elif menu == "Ledger":
-    st.header("📜 Blockchain Ledger")
-    for block in st.session_state["blockchain"].chain:
-        st.markdown(f"**Block {block.index}** — {time.ctime(block.timestamp)}")
-        st.write(block.data)
-        st.caption(f"Hash: {block.hash[:12]}...")
-        st.markdown("---")
+
+# -----------------------------
+# LEDGER TAB
+# -----------------------------
+with menu[3]:
+    st.subheader("📜 Blockchain Ledger")
+    for blk in st.session_state["blockchain"].chain:
+        with st.expander(f"Block {blk.index} | {blk.timestamp}"):
+            st.write(f"🔗 Previous Hash: {blk.prev_hash}")
+            st.write(f"🔒 Hash: {blk.hash}")
+            st.json(blk.data)

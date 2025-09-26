@@ -1,7 +1,6 @@
 import streamlit as st
 import hashlib
 import datetime
-import json
 
 # -----------------------------
 # Blockchain Classes
@@ -23,7 +22,7 @@ class Blockchain:
         self.chain = [self.create_genesis_block()]
 
     def create_genesis_block(self):
-        return Block(0, str(datetime.datetime.now()), {"ticket_id": "Genesis"}, "0")
+        return Block(0, str(datetime.datetime.now()), {"ticket_id": "GENESIS"}, "0")
 
     def get_last_block(self):
         return self.chain[-1]
@@ -38,19 +37,19 @@ class Blockchain:
         return any(block.transaction["ticket_id"] == ticket_id for block in self.chain)
 
 # -----------------------------
-# Streamlit UI
+# Streamlit Setup
 # -----------------------------
 st.set_page_config(page_title="Blockchain Ticketing", layout="wide")
 
-# Keep blockchain persistent across reruns
+# Ensure blockchain & counter exist in session_state
 if "blockchain" not in st.session_state:
-    st.session_state.blockchain = Blockchain()
+    st.session_state["blockchain"] = Blockchain()
 if "ticket_counter" not in st.session_state:
-    st.session_state.ticket_counter = 1
+    st.session_state["ticket_counter"] = 1
 
 st.title("🎟 Blockchain-based Event Ticketing System")
 
-# Replace sidebar with on-page menu
+# In-page menu instead of sidebar
 menu = st.radio("Select an Option:", ["Buy Ticket", "Verify Ticket", "View Blockchain"])
 
 # -----------------------------
@@ -59,12 +58,12 @@ menu = st.radio("Select an Option:", ["Buy Ticket", "Verify Ticket", "View Block
 if menu == "Buy Ticket":
     st.subheader("🛒 Buy a Ticket")
 
-    # Auto-generate unique ticket ID
-    ticket_id = f"TICKET{st.session_state.ticket_counter}"
-    st.session_state.ticket_counter += 1
+    # Auto-generate ticket ID
+    ticket_id = f"TICKET{st.session_state['ticket_counter']}"
 
     if st.button("Generate Ticket"):
-        new_block = st.session_state.blockchain.add_block({"ticket_id": ticket_id})
+        new_block = st.session_state["blockchain"].add_block({"ticket_id": ticket_id})
+        st.session_state["ticket_counter"] += 1
         st.success(f"🎉 Your ticket has been issued!\n\n**Ticket ID: {ticket_id}**")
 
 # -----------------------------
@@ -74,7 +73,7 @@ elif menu == "Verify Ticket":
     st.subheader("🔍 Verify Ticket")
     ticket_id_input = st.text_input("Enter Ticket ID to Verify")
     if st.button("Verify"):
-        if st.session_state.blockchain.is_ticket_valid(ticket_id_input):
+        if st.session_state["blockchain"].is_ticket_valid(ticket_id_input):
             st.success(f"✅ Ticket ID {ticket_id_input} is valid and exists on blockchain.")
         else:
             st.error(f"❌ Ticket ID {ticket_id_input} is invalid or not found.")
@@ -83,8 +82,8 @@ elif menu == "Verify Ticket":
 # View Blockchain
 # -----------------------------
 elif menu == "View Blockchain":
-    st.subheader("⛓ View Blockchain Ledger")
-    for block in st.session_state.blockchain.chain:
+    st.subheader("⛓ Blockchain Ledger")
+    for block in st.session_state["blockchain"].chain:
         st.json({
             "Index": block.index,
             "Timestamp": block.timestamp,

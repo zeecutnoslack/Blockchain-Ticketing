@@ -57,7 +57,8 @@ class Blockchain:
         block_copy = dict(block)
         block_copy.pop('hash', None)
         return hashlib.sha256(json.dumps(block_copy, sort_keys=True).encode()).hexdigest()
-from flask import Flask, request, jsonify
+        
+import streamlit as st
 from blockchain import Blockchain
 
 app = Flask(__name__)

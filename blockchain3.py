@@ -188,19 +188,19 @@ with tab2:
                 st.session_state["sold_tickets"][event_index] += 1
 
                 # Generate QR Code
-              if QR_AVAILABLE:
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=6,
-        border=4,
-    )
-    qr.add_data(ticket_details)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    st.image(img, caption="Your Ticket QR Code")
-else:
-    st.warning("⚠ QR code feature is unavailable (missing `qrcode` library). Please check requirements.txt")
+                if QR_AVAILABLE:
+                qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_H,
+                box_size=6,
+                border=4,
+                )
+                qr.add_data(ticket_details)
+                qr.make(fit=True)
+                img = qr.make_image(fill_color="black", back_color="white")
+                st.image(img, caption="Your Ticket QR Code")
+                else:
+                st.warning("⚠ QR code feature is unavailable (missing `qrcode` library). Please check requirements.txt")
 
 
                 # Show ticket card

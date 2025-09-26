@@ -3,7 +3,7 @@ import hashlib
 import time
 import random
 
-# QR code support (optional)
+# Optional QR support
 try:
     import qrcode, io
     QR_AVAILABLE = True
@@ -60,7 +60,7 @@ events = [
         "venue": "Wembley Stadium, London",
         "price": 120,
         "tickets": 50,
-        "perks": "Free Drinks + Backstage Access"
+        "perks": "🎉 Free Drinks + Backstage Access"
     },
     {
         "id": 2,
@@ -70,7 +70,7 @@ events = [
         "venue": "NSCI Dome, Mumbai",
         "price": 80,
         "tickets": 40,
-        "perks": "Meet & Greet + Free Merchandise"
+        "perks": "🎁 Meet & Greet + Free Merchandise"
     },
     {
         "id": 3,
@@ -80,41 +80,60 @@ events = [
         "venue": "Madison Square Garden, NY",
         "price": 150,
         "tickets": 60,
-        "perks": "VIP Lounge + Signed Poster"
+        "perks": "🔥 VIP Lounge + Signed Poster"
     },
 ]
 
 # -----------------------
 # Streamlit UI
 # -----------------------
-st.set_page_config(page_title="Blockchain Ticketing", layout="centered")
+st.set_page_config(page_title="🎟️ Blockchain Ticketing", layout="wide")
 
 if "blockchain" not in st.session_state:
     st.session_state["blockchain"] = Blockchain()
 
-st.title("🎟️ Blockchain-Based Event Ticketing System")
-
-menu = st.radio("Choose an option", ["Buy Ticket", "Verify Ticket", "View Ledger"])
+st.sidebar.title("🎶 Navigation")
+menu = st.sidebar.radio("Go to", ["🏠 Home", "🎟️ Buy Ticket", "✅ Verify Ticket", "📒 Ledger"])
 
 # -----------------------
-# Buy Ticket
+# HOME
 # -----------------------
-if menu == "Buy Ticket":
+if menu == "🏠 Home":
+    st.title("🎟️ Welcome to Blockchain Event Ticketing")
+    st.markdown("Experience the **future of ticketing** — secure, fun, and verifiable on the blockchain.")
+
+    st.subheader("✨ Featured Events")
+    cols = st.columns(3)
+    for i, ev in enumerate(events):
+        with cols[i % 3]:
+            st.markdown(f"### {ev['name']}")
+            st.write(f"**Artist:** {ev['artist']}")
+            st.write(f"**Date:** {ev['date']}")
+            st.write(f"**Venue:** {ev['venue']}")
+            st.write(f"**Price:** ${ev['price']}")
+            st.write(f"**Tickets Left:** {ev['tickets']}")
+            st.caption(ev['perks'])
+            if st.button(f"🎟️ Book {ev['artist']} Now", key=f"book_home_{ev['id']}"):
+                st.session_state["menu_override"] = "🎟️ Buy Ticket"
+
+# -----------------------
+# BUY TICKET
+# -----------------------
+elif menu == "🎟️ Buy Ticket" or st.session_state.get("menu_override") == "🎟️ Buy Ticket":
+    st.session_state["menu_override"] = None
     st.header("🛒 Buy a Ticket")
 
     event_choice = st.selectbox("Select an Event", events, format_func=lambda e: f"{e['name']} ({e['artist']})")
 
     if event_choice["tickets"] > 0:
         buyer_name = st.text_input("Enter your Name")
-        if st.button("Proceed to Payment"):
+        if st.button("💳 Proceed to Payment"):
             if buyer_name.strip() == "":
                 st.warning("Please enter your name before buying.")
             else:
-                # Mock payment
-                with st.spinner("Processing payment..."):
+                with st.spinner("Processing secure blockchain payment..."):
                     time.sleep(2)
 
-                # Generate ticket details
                 ticket_id = hashlib.sha256(f"{buyer_name}{time.time()}".encode()).hexdigest()[:10]
                 seat = f"Seat-{random.randint(1,100)}"
 
@@ -129,33 +148,29 @@ if menu == "Buy Ticket":
                     "price": event_choice["price"]
                 }
 
-                # Add to blockchain
                 new_block = st.session_state["blockchain"].add_block(ticket_data)
 
-                # Reduce available tickets
                 for ev in events:
                     if ev["id"] == event_choice["id"]:
                         ev["tickets"] -= 1
 
-                # Show ticket summary
-                st.success("✅ Ticket Purchased Successfully!")
+                st.success("🎉 Ticket Purchased Successfully!")
 
-                st.subheader("Your Ticket Details")
-                st.write(f"**Ticket ID:** {ticket_id}")
-                st.write(f"**Buyer:** {buyer_name}")
-                st.write(f"**Event:** {event_choice['name']} ({event_choice['artist']})")
-                st.write(f"**Date & Venue:** {event_choice['date']} at {event_choice['venue']}")
-                st.write(f"**Seat:** {seat}")
-                st.write(f"**Price:** ${event_choice['price']}")
-                st.write(f"**Perks:** {event_choice['perks']}")
-                st.caption(f"Hash: {new_block.hash[:12]}...")
+                st.subheader("📄 Your Ticket")
+                st.markdown(f"**Ticket ID:** `{ticket_id}`")
+                st.write(f"👤 Buyer: {buyer_name}")
+                st.write(f"🎶 Event: {event_choice['name']} ({event_choice['artist']})")
+                st.write(f"📅 Date & Venue: {event_choice['date']} at {event_choice['venue']}")
+                st.write(f"💺 Seat: {seat}")
+                st.write(f"💲 Price: ${event_choice['price']}")
+                st.write(f"✨ Perks: {event_choice['perks']}")
+                st.caption(f"🔒 Hash: {new_block.hash[:12]}...")
 
-                # QR Code
                 if QR_AVAILABLE:
                     qr = qrcode.make(f"Ticket ID: {ticket_id}\nBuyer: {buyer_name}\nEvent: {event_choice['name']}\nSeat: {seat}")
                     buf = io.BytesIO()
                     qr.save(buf, format="PNG")
-                    st.image(buf.getvalue(), caption="📷 Scan QR to Verify", use_container_width=False)
+                    st.image(buf.getvalue(), caption="📷 Scan to Verify", use_container_width=False)
                 else:
                     st.warning("⚠️ QR code library not installed. Add `qrcode[pil]` to requirements.txt")
 
@@ -163,9 +178,9 @@ if menu == "Buy Ticket":
         st.error("❌ No tickets left for this event!")
 
 # -----------------------
-# Verify Ticket
+# VERIFY TICKET
 # -----------------------
-elif menu == "Verify Ticket":
+elif menu == "✅ Verify Ticket":
     st.header("🔍 Verify Ticket")
 
     option = st.radio("Choose Verification Method", ["By Ticket ID", "By Buyer Name"])
@@ -191,16 +206,13 @@ elif menu == "Verify Ticket":
                 st.error("❌ Ticket not found!")
 
 # -----------------------
-# Ledger
+# LEDGER
 # -----------------------
-elif menu == "View Ledger":
+elif menu == "📒 Ledger":
     st.header("📒 Blockchain Ledger")
 
     for block in st.session_state["blockchain"].chain:
-        with st.container():
-            st.markdown(f"### 🔗 Block {block.index}")
-            st.write(f"⏰ Timestamp: {time.ctime(block.timestamp)}")
-            st.write(f"📦 Data: {block.data}")
-            st.write(f"🔑 Prev Hash: {block.prev_hash[:12]}...")
-            st.write(f"🔒 Hash: {block.hash[:12]}...")
-            st.divider()
+        with st.expander(f"🔗 Block {block.index}"):
+            st.write(f"⏰ {time.ctime(block.timestamp)}")
+            st.json(block.data)
+            st.caption(f"Prev Hash: {block.prev_hash[:12]}... | Hash: {block.hash[:12]}...")

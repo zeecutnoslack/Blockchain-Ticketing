@@ -6,7 +6,7 @@ from datetime import datetime
 from PIL import Image
 import io
 
-# Optional: QRCode library check
+# Optional: QRCode library
 try:
     import qrcode
     QR_AVAILABLE = True
@@ -23,8 +23,9 @@ class Block:
         self.hash = self.calc_hash()
 
     def calc_hash(self):
-        block_string = f"{self.index}{self.timestamp}{self.data}{self.prev_hash}"
-        return hashlib.sha256(block_string.encode()).hexdigest()
+        return hashlib.sha256(
+            f"{self.index}{self.timestamp}{self.data}{self.prev_hash}".encode()
+        ).hexdigest()
 
 class Blockchain:
     def __init__(self):
@@ -61,7 +62,7 @@ def generate_qr(text):
     buf.seek(0)
     return buf
 
-def safe_rerun():
+def rerun():
     try:
         st.rerun()
     except:
@@ -69,11 +70,11 @@ def safe_rerun():
 
 # ---------------- Events ---------------- #
 events = [
-    {"name": "Imagine Dragons Live", "artist": "Imagine Dragons", "location": "Los Angeles", "date": "2025-10-15", "price": 120, "tickets_left": 50},
-    {"name": "Ed Sheeran World Tour", "artist": "Ed Sheeran", "location": "New York", "date": "2025-11-02", "price": 150, "tickets_left": 70},
-    {"name": "Taylor Swift Eras Tour", "artist": "Taylor Swift", "location": "London", "date": "2025-12-01", "price": 200, "tickets_left": 100},
-    {"name": "Coldplay Night", "artist": "Coldplay", "location": "Paris", "date": "2025-10-20", "price": 180, "tickets_left": 40},
-    {"name": "Drake Live", "artist": "Drake", "location": "Toronto", "date": "2025-11-15", "price": 160, "tickets_left": 60},
+    {"name": "Imagine Dragons Live", "artist": "Imagine Dragons", "location": "Mumbai", "date": "2025-10-15", "price": 8000, "tickets_left": 50},
+    {"name": "Ed Sheeran World Tour", "artist": "Ed Sheeran", "location": "Delhi", "date": "2025-11-02", "price": 9500, "tickets_left": 70},
+    {"name": "Taylor Swift Eras Tour", "artist": "Taylor Swift", "location": "Bengaluru", "date": "2025-12-01", "price": 12000, "tickets_left": 100},
+    {"name": "Coldplay Night", "artist": "Coldplay", "location": "Hyderabad", "date": "2025-10-20", "price": 10000, "tickets_left": 40},
+    {"name": "Drake Live", "artist": "Drake", "location": "Kolkata", "date": "2025-11-15", "price": 9000, "tickets_left": 60},
 ]
 
 # ---------------- Session ---------------- #
@@ -84,7 +85,6 @@ if "selected_event" not in st.session_state:
 
 # ---------------- UI Layout ---------------- #
 st.set_page_config(page_title="🎟️ Blockchain Ticketing", layout="wide")
-
 menu = st.radio("Navigate", ["Home", "Buy Ticket", "Verify Ticket", "Ledger"], horizontal=True)
 
 # ---------------- Home ---------------- #
@@ -96,37 +96,35 @@ if menu == "Home":
             st.subheader(ev["name"])
             st.write(f"🎤 {ev['artist']}")
             st.write(f"📍 {ev['location']} | 📅 {ev['date']}")
-            st.write(f"💵 ${ev['price']} | 🎟️ Left: {ev['tickets_left']}")
+            st.write(f"💰 ₹{ev['price']} | 🎟️ Left: {ev['tickets_left']}")
             if st.button("Book Now", key=f"book{i}"):
                 st.session_state["selected_event"] = ev
-                safe_rerun()
+                st.session_state["force_buy"] = True
+                rerun()
 
 # ---------------- Buy Ticket ---------------- #
 elif menu == "Buy Ticket":
     st.header("🎫 Buy Ticket")
-    if st.session_state["selected_event"]:
-        ev = st.session_state["selected_event"]
+    ev = st.session_state.get("selected_event")
+    if ev:
         st.subheader(ev["name"])
         st.write(f"🎤 {ev['artist']} | 📍 {ev['location']} | 📅 {ev['date']}")
-        st.write(f"💵 Price starts at ${ev['price']} | 🎟️ Tickets Left: {ev['tickets_left']}")
+        st.write(f"💰 Base Price: ₹{ev['price']} | 🎟️ Tickets Left: {ev['tickets_left']}")
 
         buyer = st.text_input("👤 Your Name")
 
-        # Seat Type
         seat_type = st.selectbox("Choose Seat Type", ["Standard", "VIP", "Premium"])
-        base_price = ev["price"] + (0 if seat_type == "Standard" else 50 if seat_type == "VIP" else 100)
+        base_price = ev["price"] + (0 if seat_type == "Standard" else 3000 if seat_type == "VIP" else 5000)
 
-        # Row & Seat
+        num_tickets = st.number_input("Number of Tickets", min_value=1, max_value=5, value=1)
+
         row = st.selectbox("Row", list("ABCDEFGH"))
-        seat_num = random.randint(1, 30)
-        seat = f"{row}{seat_num}"
+        seats = [f"{row}{random.randint(1, 30)}" for _ in range(num_tickets)]
 
-        # Perks
         perks = st.multiselect("Choose Perks", ["Free Drink", "Backstage Pass", "Merchandise", "Meet & Greet"])
-        total_price = base_price + len(perks) * 20
-        st.info(f"💵 Total Price: ${total_price}")
+        total_price = (base_price + len(perks) * 500) * num_tickets
+        st.info(f"💵 Total Price: ₹{total_price}")
 
-        # Payment
         with st.form("payment_form"):
             card_name = st.text_input("Name on Card")
             card_number = st.text_input("Card Number", type="password", max_chars=16)
@@ -137,32 +135,35 @@ elif menu == "Buy Ticket":
         if confirm:
             if not buyer or not card_name or not card_number or not expiry or not cvv:
                 st.error("⚠️ Fill all fields")
-            elif ev["tickets_left"] <= 0:
-                st.error("❌ Tickets sold out")
+            elif ev["tickets_left"] < num_tickets:
+                st.error("❌ Not enough tickets available")
             else:
-                ticket_id = generate_ticket_id()
-                ev["tickets_left"] -= 1
-                tx = {
-                    "buyer": buyer, "event": ev["name"], "artist": ev["artist"],
-                    "location": ev["location"], "date": ev["date"],
-                    "seat": seat, "seat_type": seat_type, "perks": perks,
-                    "price": total_price, "ticket_id": ticket_id
-                }
-                st.session_state["blockchain"].add_block(tx)
+                tickets = []
+                for seat in seats:
+                    ticket_id = generate_ticket_id()
+                    ev["tickets_left"] -= 1
+                    tx = {
+                        "buyer": buyer, "event": ev["name"], "artist": ev["artist"],
+                        "location": ev["location"], "date": ev["date"],
+                        "seat": seat, "seat_type": seat_type, "perks": perks,
+                        "price": total_price, "ticket_id": ticket_id
+                    }
+                    st.session_state["blockchain"].add_block(tx)
+                    tickets.append((ticket_id, seat))
 
-                st.success("🎉 Ticket Booked!")
-                st.subheader("Your Ticket")
-                st.write(f"👤 {buyer}")
-                st.write(f"🎤 {ev['artist']}")
-                st.write(f"📍 {ev['location']} | {ev['date']}")
-                st.write(f"🎟️ Seat: {seat} ({seat_type})")
-                st.write(f"⭐ Perks: {', '.join(perks) if perks else 'None'}")
-                st.write(f"💵 Price: ${total_price}")
-                st.code(ticket_id, language="bash")
-
-                if QR_AVAILABLE:
-                    qr_buf = generate_qr(f"Ticket:{ticket_id}|Buyer:{buyer}|Event:{ev['name']}")
-                    st.image(Image.open(qr_buf), caption="📲 Scan to Verify Ticket")
+                st.success("🎉 Ticket(s) Booked!")
+                for tid, seat in tickets:
+                    st.subheader("Your Ticket")
+                    st.write(f"👤 {buyer}")
+                    st.write(f"🎤 {ev['artist']}")
+                    st.write(f"📍 {ev['location']} | {ev['date']}")
+                    st.write(f"🎟️ Seat: {seat} ({seat_type})")
+                    st.write(f"⭐ Perks: {', '.join(perks) if perks else 'None'}")
+                    st.write(f"💵 Price: ₹{total_price//num_tickets}")
+                    st.code(tid, language="bash")
+                    if QR_AVAILABLE:
+                        qr_buf = generate_qr(f"Ticket:{tid}|Buyer:{buyer}|Event:{ev['name']}")
+                        st.image(Image.open(qr_buf), caption="📲 Scan to Verify Ticket")
     else:
         st.info("Select an event from Home to book tickets.")
 
@@ -181,7 +182,10 @@ elif menu == "Verify Ticket":
 # ---------------- Ledger ---------------- #
 elif menu == "Ledger":
     st.header("📒 Blockchain Ledger")
-    for block in st.session_state["blockchain"].chain:
-        with st.expander(f"Block {block.index} | Hash: {block.hash[:10]}..."):
-            st.write(f"⏰ {datetime.fromtimestamp(block.timestamp)}")
-            st.json(block.data)
+    if "blockchain" in st.session_state:
+        for block in st.session_state["blockchain"].chain:
+            with st.expander(f"Block {block.index} | Hash: {block.hash[:10]}..."):
+                st.write(f"⏰ {datetime.fromtimestamp(block.timestamp)}")
+                st.json(block.data)
+    else:
+        st.error("⚠️ Blockchain not initialized")

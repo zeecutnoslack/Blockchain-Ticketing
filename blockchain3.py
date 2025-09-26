@@ -166,7 +166,8 @@ with tab_buy:
                     "event": event_choice,
                     "buyer": buyer_name.strip(),
                 }
-                st.experimental_rerun()
+                st.rerun()
+
 
     else:
         purchase = st.session_state["pending_purchase"]

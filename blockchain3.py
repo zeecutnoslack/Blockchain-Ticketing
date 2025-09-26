@@ -2,9 +2,13 @@ import streamlit as st
 import hashlib
 import time
 import random
-import qrcode
-from io import BytesIO
-from PIL import Image
+try:
+    import qrcode
+    from PIL import Image
+    QR_AVAILABLE = True
+except ImportError:
+    QR_AVAILABLE = False
+
 
 # ---------------------------
 # Blockchain Classes
@@ -184,11 +188,20 @@ with tab2:
                 st.session_state["sold_tickets"][event_index] += 1
 
                 # Generate QR Code
-                qr_data = f"TicketID: {ticket_id} | Buyer: {buyer_name} | Event: {event['name']} | Seat: {seat}"
-                qr_img = generate_qr_code(qr_data)
-                buf = BytesIO()
-                qr_img.save(buf)
-                st.image(buf, caption="Scan to Verify", width=200)
+              if QR_AVAILABLE:
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=6,
+        border=4,
+    )
+    qr.add_data(ticket_details)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    st.image(img, caption="Your Ticket QR Code")
+else:
+    st.warning("⚠ QR code feature is unavailable (missing `qrcode` library). Please check requirements.txt")
+
 
                 # Show ticket card
                 st.success("✅ Purchase Successful!")

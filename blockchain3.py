@@ -1,96 +1,84 @@
 import hashlib
 import json
-from time import time
+import time
+import streamlit as st
 
+# ---------------- Blockchain ----------------
 class Blockchain:
     def __init__(self):
         self.chain = []
-        self.current_tickets = []
-        self.create_block(previous_hash="1")  # Genesis block
+        self.create_block(previous_hash="0", data="Genesis Block")
 
-    def create_block(self, previous_hash):
+    def create_block(self, previous_hash, data):
         block = {
-            'index': len(self.chain) + 1,
-            'timestamp': time(),
-            'tickets': self.current_tickets,
-            'previous_hash': previous_hash
+            "index": len(self.chain) + 1,
+            "timestamp": str(time.time()),
+            "data": data,
+            "previous_hash": previous_hash,
+            "hash": self.hash_block(len(self.chain) + 1, time.time(), data, previous_hash),
         }
-        block['hash'] = self.hash(block)
-        self.current_tickets = []
         self.chain.append(block)
         return block
 
-    def add_ticket(self, event_id, ticket_id, owner):
-        # Each ticket is unique
-        ticket = {
-            'event_id': event_id,
-            'ticket_id': ticket_id,
-            'owner': owner,
-            'redeemed': False
-        }
-        self.current_tickets.append(ticket)
-        return ticket
+    def hash_block(self, index, timestamp, data, previous_hash):
+        block_string = f"{index}{timestamp}{data}{previous_hash}"
+        return hashlib.sha256(block_string.encode()).hexdigest()
 
-    def redeem_ticket(self, ticket_id):
+    def get_previous_block(self):
+        return self.chain[-1]
+
+    def is_chain_valid(self):
+        for i in range(1, len(self.chain)):
+            current = self.chain[i]
+            prev = self.chain[i - 1]
+            if current["previous_hash"] != prev["hash"]:
+                return False
+        return True
+
+    def verify_ticket(self, ticket_id):
         for block in self.chain:
-            for t in block['tickets']:
-                if t['ticket_id'] == ticket_id:
-                    if t['redeemed']:
-                        return False
-                    t['redeemed'] = True
-                    return True
+            if block["data"] == ticket_id:
+                return True
         return False
 
-    def verify_ticket(self, ticket_id, event_id):
-        for block in self.chain:
-            for t in block['tickets']:
-                if t['ticket_id'] == ticket_id:
-                    if t['event_id'] != event_id:
-                        return {"valid": False, "reason": "wrong_event"}
-                    if t['redeemed']:
-                        return {"valid": False, "reason": "already_redeemed"}
-                    return {"valid": True, "owner": t['owner']}
-        return {"valid": False, "reason": "not_found"}
 
-    @staticmethod
-    def hash(block):
-        block_copy = dict(block)
-        block_copy.pop('hash', None)
-        return hashlib.sha256(json.dumps(block_copy, sort_keys=True).encode()).hexdigest()
-        
-import streamlit as st
-from blockchain import Blockchain
+# ---------------- Streamlit UI ----------------
+st.set_page_config(page_title="Blockchain Ticketing", page_icon="🎟️", layout="centered")
+st.title("🎟️ Blockchain-based Event Ticketing System")
 
-app = Flask(__name__)
-blockchain = Blockchain()
+# Initialize blockchain (session state)
+if "blockchain" not in st.session_state:
+    st.session_state.blockchain = Blockchain()
 
-@app.route('/create_event', methods=['POST'])
-def create_event():
-    data = request.json
-    event_id = data.get('event_id')
-    return jsonify({"message": f"Event {event_id} created"}), 201
+blockchain = st.session_state.blockchain
 
-@app.route('/mint_ticket', methods=['POST'])
-def mint_ticket():
-    data = request.json
-    ticket = blockchain.add_ticket(
-        event_id=data['event_id'],
-        ticket_id=data['ticket_id'],
-        owner=data['owner']
-    )
-    blockchain.create_block(previous_hash=blockchain.chain[-1]['hash'])
-    return jsonify(ticket), 201
+menu = ["Buy Ticket", "Verify Ticket", "View Blockchain"]
+choice = st.sidebar.selectbox("Menu", menu)
 
-@app.route('/verify/<ticket_id>/<event_id>', methods=['GET'])
-def verify(ticket_id, event_id):
-    result = blockchain.verify_ticket(ticket_id, event_id)
-    return jsonify(result), 200
+if choice == "Buy Ticket":
+    st.subheader("🛒 Buy a Ticket")
+    ticket_id = st.text_input("Enter Ticket ID")
+    if st.button("Buy Ticket"):
+        if blockchain.verify_ticket(ticket_id):
+            st.error("❌ Ticket already exists (duplicate not allowed)!")
+        else:
+            prev_block = blockchain.get_previous_block()
+            new_block = blockchain.create_block(prev_block["hash"], ticket_id)
+            st.success(f"✅ Ticket Purchased Successfully! Block #{new_block['index']} created.")
 
-@app.route('/redeem/<ticket_id>', methods=['POST'])
-def redeem(ticket_id):
-    success = blockchain.redeem_ticket(ticket_id)
-    return jsonify({"redeemed": success}), 200
+elif choice == "Verify Ticket":
+    st.subheader("🔍 Verify Ticket")
+    ticket_id = st.text_input("Enter Ticket ID to Verify")
+    if st.button("Verify"):
+        if blockchain.verify_ticket(ticket_id):
+            st.success("✅ Ticket is VALID (exists in blockchain).")
+        else:
+            st.error("❌ Ticket is INVALID (not found in blockchain).")
 
-if __name__ == '__main__':
-    app.run(debug=True)
+elif choice == "View Blockchain":
+    st.subheader("⛓️ Blockchain Ledger")
+    for block in blockchain.chain:
+        st.json(block)
 
+# Footer
+st.caption("🚀 Powered by Blockchain Simulation in Python & Streamlit")

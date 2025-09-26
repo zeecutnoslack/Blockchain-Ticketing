@@ -82,14 +82,17 @@ elif menu == "Verify Ticket":
 # View Blockchain
 # -----------------------------
 elif menu == "View Blockchain":
-    st.subheader("⛓ Blockchain Ledger")
+    st.subheader("Blockchain Ledger")
+
     for block in st.session_state["blockchain"].chain:
-        st.json({
-            "Index": block.index,
-            "Timestamp": block.timestamp,
-            "Ticket": block.transaction,
-            "Hash": block.hash,
-            "Previous Hash": block.previous_hash
-        })
+        st.markdown(f"""
+        ### Block {block.index}
+        - Timestamp: {block.timestamp}
+        - Ticket ID: {block.transaction["ticket_id"]}
+        - Hash: {block.hash[:10]}...
+        - Previous Hash: {block.previous_hash[:10]}...
+        ---
+        """)
+
 
 st.caption("🚀 Powered by Blockchain Simulation in Python & Streamlit")
